@@ -1,4 +1,4 @@
-function [hough_space1,hough_space2,B_scan_image_Mean_cancel,B_scan_image_down_sample,Downsample_N,Relative_permittivity1,Relative_permittivity2,R,TrackInterval,dt,alpha1,alpha2,n,epsilon_r] = generate_hough_space(path,mode,image_path,image_save)
+function [hough_space1,hough_space2,B_scan_image_Mean_cancel,B_scan_image_down_sample,Downsample_N,Relative_permittivity1,Relative_permittivity2,Radius,TrackInterval,dt,alpha1,alpha2,n,epsilon_r] = generate_hough_space(path,mode,image_path,image_save)
 %UNTITLED3 此处显示有关此函数的摘要
 %   此处显示详细说明
 epsilon_r = 0;
@@ -295,34 +295,53 @@ data_out = B_scan_image_edge_cols_filter;
 %     saveas(h,[image_path,image_name,'.png']);
 % end
 
-%% 双曲线霍夫变换-off
+%% 双曲线霍夫变换-on
 % 确定参数空间
 epsilon = 2.5:0.1:14;  % 相对介电常数范围（地下介质的物理参数，影响雷达波速）
 % 解释： v = c/√εᵣ  q = 1/v² = εᵣ/c²
 % 陈师兄原代码：q = epsilon*(1 / 0.3)^2;  % 转换为霍夫变换所需的参数（与波速相关，公式源于双曲线方程）
 q = epsilon/(3e8)^2;  % 转换为霍夫变换所需的参数（与波速相关，公式源于双曲线方程）
-R = 0.05;    % 管线半径
-% hough_space1 = hyperbola_hough_transform1(data_out,dt,TrackInterval,q,0,Downsample_N,R);  % 生成双曲线霍夫空间
-% hough_space2 = hyperbola_hough_transform2(data_out,dt,TrackInterval,q,0,Downsample_N,R);
-hough_space1 = 0;
-hough_space2 = 0;
+Radius = 0;    % 管线半径
+hough_space1 = hyperbola_hough_transform1(data_out,dt,TrackInterval,q,0,Downsample_N,Radius);  % 生成双曲线霍夫空间
+hough_space2 = hyperbola_hough_transform2(data_out,dt,TrackInterval,q,0,Downsample_N,Radius);
+% hough_space1 = 0;
+% hough_space2 = 0;
+
+max_para1=max(hough_space1,[],1);
+max_para1=max(max_para1,[],2);
+[~,max_match_q] = max(squeeze(max_para1));  % 找出最佳匹配参数
 
 % Relative_permittivity1=0;Relative_permittivity2=0;
-%% 类分离直线霍夫变换
-[Relative_permittivity,alpha] = extract_top_hough_lines(data_out,TrackInterval,dt*Downsample_N);
-Relative_permittivity1 = Relative_permittivity;
-Relative_permittivity2 = Relative_permittivity;
-alpha1 = alpha;
-alpha2 = alpha;
+%% 类分离直线霍夫变换-off
+% [Relative_permittivity,alpha] = extract_top_hough_lines(data_out,TrackInterval,dt*Downsample_N);
+% Relative_permittivity1 = Relative_permittivity;
+% Relative_permittivity2 = Relative_permittivity;
+% alpha1 = alpha;
+% alpha2 = alpha;
+Relative_permittivity1 = 0;
+Relative_permittivity2 = 0;
+alpha1 = 0;
+alpha2 = 0;
 
 %% 割线拉格朗日中值点反演
-extract_lagrange_mean_points(data_out,TrackInterval,dt*Downsample_N);
+% extract_lagrange_mean_points(data_out,TrackInterval,dt*Downsample_N);
 
 %% 直线霍夫变换-on
 % [Relative_permittivity1,Relative_permittivity2,alpha1,alpha2] = lines_hough_transform(data_out,data_out,B_scan_image_Mean_cancel,Downsample_N,dt,TrackInterval);
 
-%% 直线霍夫变换，只取角度 (尘封)
-% [Relative_permittivity1,Relative_permittivity2] = angle_hough_transform(B_scan_image_edge_dilate,B_scan_image_edge_cols_filter,Downsample_N,dt,TrackInterval);
+%% Hyperbolic_Diffraction_Summation 双曲线绕射叠加
+q_in = q(max_match_q);
+data_summation_migration = Hyperbolic_Diffraction_Summation(B_scan_image_Mean_cancel,dt,TrackInterval,q_in,0,Downsample_N,Radius);
+figure;imagesc(data_summation_migration); colormap(parula); 
+
+%% Kirchhoff_Migration 克希霍夫偏移
+% for epsilon_r = 2.5:0.1:14
+%     Kirchhoff_Migration(data_out, TrackInterval, dt, epsilon_r);
+% end
+
+epsilon_r = epsilon(max_match_q);
+data_Kirchhoff_migration = Kirchhoff_Migration(B_scan_image_Mean_cancel, TrackInterval, dt*Downsample_N, epsilon_r, Radius);
+figure;imagesc(data_Kirchhoff_migration); colormap(parula); 
 
 %% 手动标注——膨胀-off
 % data_out = 1 - data_out;

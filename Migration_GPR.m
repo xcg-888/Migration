@@ -18,7 +18,7 @@ image_path = 'C:\My_workfile\毕业论文\第一个创新点钢筋网仿真in文件\新结果图\实测
 
 %% 参数设置
 image_save = "off";  % 是否保存图片
-mode = 'DZT';        % 选择输入什么后缀的文件
+mode = 'out';        % 选择输入什么后缀的文件
 
 %% 霍夫变换（内含图像预处理）
 if strcmp(mode,'lte')
@@ -65,38 +65,38 @@ q = epsilon/(3e8)^2;
     % sum_hough_space = sum(hough_space , [1,2]);
     % max_match_q =  find(sum_hough_space == max(sum_hough_space));
 
-    % max_para1=max(hough_space1,[],1);
-    % max_para1=max(max_para1,[],2);
-    % [~,max_match_q] = max(squeeze(max_para1));
-    % [target_area,row1,col1] = Vertex_Search(hough_space1(:,:,max_match_q));
-    % col1 = col1(col1 ~= 0);
-    % row1 = row1(row1 ~= 0);
-    % image_show1(col1,row1,B_scan_image_down,B_scan_image_down_Mean_cancel,target_area,max_match_q,dt,Downsample_N,R,dx,q);
-    % 
-    % max_para2=max(hough_space2,[],1);
-    % max_para2=max(max_para2,[],2);
-    % [~,max_match_q2] = max(squeeze(max_para2));
-    % [target_area2,row2,col2] = Vertex_Search(hough_space2(:,:,max_match_q2));
-    % col2 = col2(col2 ~= 0);
-    % row2 = row2(row2 ~= 0);
-    % image_show2(col2,row2,B_scan_image_down,B_scan_image_down_Mean_cancel,target_area2,max_match_q2,dt,Downsample_N,R,dx,q);
+    max_para1=max(hough_space1,[],1);
+    max_para1=max(max_para1,[],2);
+    [~,max_match_q] = max(squeeze(max_para1));
+    [target_area,row1,col1] = Vertex_Search(hough_space1(:,:,max_match_q));
+    col1 = col1(col1 ~= 0);
+    row1 = row1(row1 ~= 0);
+    image_show1(col1,row1,B_scan_image_down,B_scan_image_down_Mean_cancel,target_area,max_match_q,dt,Downsample_N,R,dx,q);
 
-%% 结果展示
+    max_para2=max(hough_space2,[],1);
+    max_para2=max(max_para2,[],2);
+    [~,max_match_q2] = max(squeeze(max_para2));
+    [target_area2,row2,col2] = Vertex_Search(hough_space2(:,:,max_match_q2));
+    col2 = col2(col2 ~= 0);
+    row2 = row2(row2 ~= 0);
+    image_show2(col2,row2,B_scan_image_down,B_scan_image_down_Mean_cancel,target_area2,max_match_q2,dt,Downsample_N,R,dx,q);
+
+%% 数据结果展示
     % disp(['花费时间是：',num2str(toc),'s']);
     % disp(['请查阅figure',num2str(max_match_q),'左右的图片']);
     % disp(['下采样阶数：',num2str(Downsample_N)]);
-    % disp(['第二代双曲线反演的介电常数：',num2str(epsilon(max_match_q))]);
-    % disp(['第三代双曲线反演的介电常数：',num2str(epsilon(max_match_q2))]);
+    disp(['第二代双曲线反演的介电常数：',num2str(epsilon(max_match_q))]);
+    disp(['第三代双曲线反演的介电常数：',num2str(epsilon(max_match_q2))]);
     % disp(['渐近线线反演的介电常数(膨胀)：',num2str(Relative_permittivity2)]);
     % disp(['渐近线线反演的介电常数(均值对消)：',num2str(Relative_permittivity)]);
     % disp(['alpha1:',num2str(alpha1)]);
     % disp(['alpha2:',num2str(alpha2)]);
     % disp(['厚度反演出的相对介电常数:',num2str(epsilon_r)]);
+    % disp(['渐近线线反演的介电常数(data_out)：',num2str(Relative_permittivity1)]);
+    % disp(['渐近线线反演的介电常数(非膨胀)：',num2str(Relative_permittivity2)]);
+    % disp(['alpha1:',num2str(alpha1)]);
+    % disp(['alpha2:',num2str(alpha2)]);
 
-    disp(['渐近线线反演的介电常数(data_out)：',num2str(Relative_permittivity1)]);
-    disp(['渐近线线反演的介电常数(非膨胀)：',num2str(Relative_permittivity2)]);
-    disp(['alpha1:',num2str(alpha1)]);
-    disp(['alpha2:',num2str(alpha2)]);
 %% 将最佳模板附近的双曲线在霍夫空间中展示出来,进行二次筛选
 % % 第二代公式霍夫变换
 % nums = 5;

@@ -39,7 +39,7 @@ function image_show1(col,row,B_scan_image_down,B_scan_image_down_Mean_cancel,tar
 
 
     figure;
-    imagesc(target_area);colormap('gray');hold on;   
+    imagesc(target_area);colormap(flipud(gray));hold on;   
     scatter(col,row,20,'r','filled');   
     title(['第二代-霍夫空间-figure:' num2str(q_n),'  epsilon:',num2str(epsilon(q_n))]);
     % 绘制双曲线

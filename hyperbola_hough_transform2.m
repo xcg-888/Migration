@@ -107,7 +107,11 @@ function hough_space = hyperbola_hough_transform2(Ydata,dt,dx,q,comp,Downsample_
 
 %% 展示霍夫空间
     figure;
-    imagesc((1:m)*dx,(1:m)*dt*Downsample_N*0.3/sqrt(epsilon)/2,abs(squeeze(hough_space2)));colormap('gray');
+    imagesc((1:m)*dx,(1:m)*dt*Downsample_N*0.3/sqrt(epsilon)/2,abs(squeeze(hough_space2)));
+    
+    % 将默认的灰度图翻转，实现低值（背景）为白，高值（目标）为黑
+    colormap(flipud(gray)); 
+    
     xlabel('X (m)','FontSize',14,'FontWeight','normal','FontName','Times New Roman');
     ylabel('Z (m)','FontSize',14,'FontWeight','normal','FontName','Times New Roman');
     set(gca,'FontSize',8,'FontWeight','normal','FontName','Times New Roman');
