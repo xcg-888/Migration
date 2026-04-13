@@ -333,7 +333,13 @@ alpha2 = 0;
 q_in = q(max_match_q);
 data_summation_migration = Hyperbolic_Diffraction_Summation(B_scan_image_Mean_cancel,dt,TrackInterval,q_in,0,Downsample_N,Radius);
 figure;imagesc(data_summation_migration); colormap(parula); 
+figure;imagesc(abs(hilbert(data_summation_migration))); colormap(parula); 
 
+% 上面为非0叠加，下面为全域叠加
+
+data_summation_migration_total = Hyperbolic_Diffraction_Summation_total(B_scan_image_Mean_cancel,dt,TrackInterval,q_in,0,Downsample_N,Radius);
+figure;imagesc(data_summation_migration_total); colormap(parula); 
+figure;imagesc(abs(hilbert(data_summation_migration_total))); colormap(parula); 
 %% Kirchhoff_Migration 克希霍夫偏移
 % for epsilon_r = 2.5:0.1:14
 %     Kirchhoff_Migration(data_out, TrackInterval, dt, epsilon_r);
@@ -342,6 +348,7 @@ figure;imagesc(data_summation_migration); colormap(parula);
 epsilon_r = epsilon(max_match_q);
 data_Kirchhoff_migration = Kirchhoff_Migration(B_scan_image_Mean_cancel, TrackInterval, dt*Downsample_N, epsilon_r, Radius);
 figure;imagesc(data_Kirchhoff_migration); colormap(parula); 
+figure;imagesc(abs(hilbert(data_Kirchhoff_migration))); colormap(parula); 
 
 %% 手动标注——膨胀-off
 % data_out = 1 - data_out;

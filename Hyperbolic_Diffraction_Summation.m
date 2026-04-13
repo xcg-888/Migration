@@ -1,5 +1,5 @@
 function migration_space = Hyperbolic_Diffraction_Summation(Ydata,dt,dx,q,comp,Downsample_N,R)
-%% 函数核心功能：使用Hough变换检测双曲线，也可以理解为模板匹配
+%% 函数核心功能：双曲线绕射叠加
 %% 输入
 % Ydata：B-scan预处理后的二值化数据
 % dt：快时间采样时间间隔，单位ns
@@ -47,8 +47,6 @@ function migration_space = Hyperbolic_Diffraction_Summation(Ydata,dt,dx,q,comp,D
             % 模板匹配
             if (row > 0) && (row <= m) 
                 migration_space(rows(i),cols(i))=migration_space(rows(i),cols(i)) + abs(s(row,j));
-
-            % % 模板范围匹配，即双曲线变粗
             % range_N = 2;
             % for range_down = range_N:-1:1
             %     if row - range_down > 0
@@ -72,17 +70,5 @@ function migration_space = Hyperbolic_Diffraction_Summation(Ydata,dt,dx,q,comp,D
         end
     end
 
-%% 双曲线检验——以(150,200)为顶点画双曲线
-    % for k=1:length(q) % 扫描介质参数空间
-    %     for j = 1:n
-    %         % row = round(  sqrt((5*dt*Downsample_N-comp)^2/4+q(k)*(j*dx-150*dx)^2)  *2/dt/Downsample_N+comp/dt); % 假设该点为双曲线顶点，计算每个A-scan对应的采样点
-    %         % row = round( sqrt((rows(i)*dt-comp)^2 + 4*q(k)*(j*dx-cols(i)*dx)^2)/dt+comp/dt ); % 假设该点为双曲线顶点，计算每个A-scan对应的采样点        
-    %         row = round(  (sqrt(((440*dt*Downsample_N-comp)/2/sqrt(q(k))+R)^2+(j*dx-125*dx)^2)-R) *2*sqrt(q(k))/dt/Downsample_N+comp/dt);
-    %         if (row > 0) && (row <= m) 
-    %             hough_space(row,j,k)=hough_space(row,j,k) + 100;
-    %         end
-    %     end
-    % end
-   
 end
 
