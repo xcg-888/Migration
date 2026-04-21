@@ -111,6 +111,8 @@ imagesc(B_scan_image_down_sample);
 colormap('gray');
 % title('维度适配-纵坐标');
 
+row_new = size(B_scan_image_down_sample, 1);  % 行数
+col_new = size(B_scan_image_down_sample, 2);  % 列数
 % B_scan_image_down_sample = B_scan_image_down_sample(:,150:250);
 % epsilon_r = h_trans(B_scan_image_down_sample,dt*Downsample_N);
 
@@ -310,6 +312,9 @@ hough_space2 = hyperbola_hough_transform2(data_out,dt,TrackInterval,q,0,Downsamp
 max_para1=max(hough_space1,[],1);
 max_para1=max(max_para1,[],2);
 [~,max_match_q] = max(squeeze(max_para1));  % 找出最佳匹配参数
+q_in = q(max_match_q);
+v = sqrt(1/q_in);
+epsilon_r = epsilon(max_match_q);
 
 % Relative_permittivity1=0;Relative_permittivity2=0;
 %% 类分离直线霍夫变换-off
@@ -330,25 +335,96 @@ alpha2 = 0;
 % [Relative_permittivity1,Relative_permittivity2,alpha1,alpha2] = lines_hough_transform(data_out,data_out,B_scan_image_Mean_cancel,Downsample_N,dt,TrackInterval);
 
 %% Hyperbolic_Diffraction_Summation 双曲线绕射叠加
-q_in = q(max_match_q);
-data_summation_migration = Hyperbolic_Diffraction_Summation(B_scan_image_Mean_cancel,dt,TrackInterval,q_in,0,Downsample_N,Radius);
-figure;imagesc(data_summation_migration); colormap(parula); 
-figure;imagesc(abs(hilbert(data_summation_migration))); colormap(parula); 
+% % 非0叠加
+% data_summation_migration = Hyperbolic_Diffraction_Summation(B_scan_image_Mean_cancel,dt,TrackInterval,q_in,0,Downsample_N,Radius);
+% figure;imagesc(data_summation_migration); colormap(parula); 
+% figure;imagesc(abs(hilbert(data_summation_migration))); colormap(parula); 
 
-% 上面为非0叠加，下面为全域叠加
-
+% 全域叠加
 data_summation_migration_total = Hyperbolic_Diffraction_Summation_total(B_scan_image_Mean_cancel,dt,TrackInterval,q_in,0,Downsample_N,Radius);
-figure;imagesc(data_summation_migration_total); colormap(parula); 
-figure;imagesc(abs(hilbert(data_summation_migration_total))); colormap(parula); 
+figure;imagesc(data_summation_migration_total); colormap(parula); title('双曲线绕射叠加');
+figure;imagesc(abs(hilbert(data_summation_migration_total))); colormap(parula); title('双曲线绕射叠加-希尔伯特变换包络');
+
 %% Kirchhoff_Migration 克希霍夫偏移
 % for epsilon_r = 2.5:0.1:14
 %     Kirchhoff_Migration(data_out, TrackInterval, dt, epsilon_r);
 % end
 
-epsilon_r = epsilon(max_match_q);
-data_Kirchhoff_migration = Kirchhoff_Migration(B_scan_image_Mean_cancel, TrackInterval, dt*Downsample_N, epsilon_r, Radius);
-figure;imagesc(data_Kirchhoff_migration); colormap(parula); 
-figure;imagesc(abs(hilbert(data_Kirchhoff_migration))); colormap(parula); 
+ data_Kirchhoff_migration = Kirchhoff_Migration(B_scan_image_Mean_cancel, TrackInterval, dt*Downsample_N, epsilon_r, Radius);
+ figure;imagesc(data_Kirchhoff_migration); colormap(parula); title('克希霍夫偏移');
+ figure;imagesc(abs(hilbert(data_Kirchhoff_migration))); colormap(parula); title('克希霍夫偏移-希尔伯特变换包络');
+
+%% Phase-Shift Migration, PSM 相位偏移
+ data_phase_shift_migration = phase_shift_migration(B_scan_image_Mean_cancel, TrackInterval, dt*Downsample_N, epsilon_r);
+ figure;imagesc(data_phase_shift_migration); colormap(parula); title('相移偏移');
+ figure;imagesc(abs(hilbert(data_phase_shift_migration))); colormap(parula); title('相移偏移-希尔伯特变换包络');
+
+ %% Stolt_Migration  Stolt 偏移
+ [data_stolt_migration, ~] = stolt_migration(B_scan_image_Mean_cancel, dt*Downsample_N, TrackInterval, epsilon_r);
+ figure;imagesc(data_stolt_migration); colormap(parula); title('Stolt偏移');
+ figure;imagesc(abs(hilbert(data_stolt_migration))); colormap(parula); title('Stolt偏移-希尔伯特变换包络');
+
+ %% BP migration 后向投影偏移
+ [ratate_mig_theta_data,ratate_mig_data] = ratate_migration(B_scan_image_Mean_cancel, dt*Downsample_N, TrackInterval, epsilon_r);
+ figure;imagesc(ratate_mig_theta_data); colormap(parula); title('补偿BP偏移');
+ figure;imagesc(abs(hilbert(ratate_mig_theta_data))); colormap(parula); title('补偿BP偏移-希尔伯特变换包络');
+ figure;imagesc(ratate_mig_data); colormap(parula); title('BP偏移');
+ figure;imagesc(abs(hilbert(ratate_mig_data))); colormap(parula); title('BP偏移-希尔伯特变换包络');
+
+ %% RTM migration 逆时偏移
+ f0 = 4e8; % gprmax:4e8 real:
+ v_model = ones(col_new)*3e8/sqrt(epsilon_r);
+ [RTM_Image_Final, RTM_Image_Raw] = GPR_RTM_RealData(B_scan_image_Mean_cancel, dt*Downsample_N, 0.02, 0.02, v_model, f0, 0);
+ figure;imagesc(RTM_Image_Final); colormap(parula); title('补偿逆时偏移');
+ figure;imagesc(abs(hilbert(RTM_Image_Final))); colormap(parula); title('补偿逆时偏移-希尔伯特变换包络');
+ figure;imagesc(RTM_Image_Raw); colormap(parula); title('逆时偏移');
+ figure;imagesc(abs(hilbert(RTM_Image_Raw))); colormap(parula); title('逆时偏移-希尔伯特变换包络');
+
+%% 偏移展示
+figure('Name', '偏移算法效果对比', 'Position', [100, 100, 1200, 800]);
+
+% 1. 原图
+subplot(2, 4, 1);
+imagesc(abs(hilbert(B_scan_image_Mean_cancel)));
+colormap(parula);
+title('原始数据 (B-scan)');
+
+% 2. 双曲线绕射叠加
+subplot(2, 4, 2);
+imagesc(abs(hilbert(data_summation_migration_total)));
+colormap(parula);
+title('双曲线绕射叠加');
+
+% 3. 克希霍夫偏移
+subplot(2, 4, 3);
+imagesc(abs(hilbert(data_Kirchhoff_migration)));
+colormap(parula);
+title('克希霍夫偏移');
+
+% 4. 相位偏移 (Phase Shift)
+subplot(2, 4, 4);
+imagesc(abs(hilbert(data_phase_shift_migration)));
+colormap(parula);
+title('相移偏移');
+
+% 5. Stolt偏移
+subplot(2, 4, 5);
+imagesc(abs(hilbert(data_stolt_migration)));
+colormap(parula);
+title('Stolt偏移');
+
+% 6. 旋转偏移
+subplot(2, 4, 6);
+imagesc(abs(hilbert(ratate_mig_theta_data)));
+colormap(parula);
+title('旋转偏移');
+
+% 7. 逆时偏移
+subplot(2, 4, 6);
+imagesc(abs(hilbert(RTM_Image_Final)));
+colormap(parula);
+title('逆时偏移');
+
 
 %% 手动标注——膨胀-off
 % data_out = 1 - data_out;
