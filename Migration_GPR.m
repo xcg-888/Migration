@@ -18,7 +18,7 @@ image_path = 'C:\My_workfile\毕业论文\第一个创新点钢筋网仿真in文件\新结果图\实测
 
 %% 参数设置
 image_save = "off";  % 是否保存图片
-mode = 'out';        % 选择输入什么后缀的文件
+mode = 'lte';        % 选择输入什么后缀的文件
 
 %% 霍夫变换（内含图像预处理）
 if strcmp(mode,'lte')

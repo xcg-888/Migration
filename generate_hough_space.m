@@ -1,7 +1,7 @@
 function [hough_space1,hough_space2,B_scan_image_Mean_cancel,B_scan_image_down_sample,Downsample_N,Relative_permittivity1,Relative_permittivity2,Radius,TrackInterval,dt,alpha1,alpha2,n,epsilon_r] = generate_hough_space(path,mode,image_path,image_save)
 %UNTITLED3 此处显示有关此函数的摘要
 %   此处显示详细说明
-epsilon_r = 0;
+
 %% 读取文件以及获取参数
 if strcmp(mode,'DZT')
     [imagename, pathname] = uigetfile('*.DZT', 'Select gprMax file to analyse', 'MultiSelect', 'on');
@@ -313,8 +313,8 @@ max_para1=max(hough_space1,[],1);
 max_para1=max(max_para1,[],2);
 [~,max_match_q] = max(squeeze(max_para1));  % 找出最佳匹配参数
 q_in = q(max_match_q);
-v = sqrt(1/q_in);
 epsilon_r = epsilon(max_match_q);
+v = 3e8 / sqrt(epsilon_r);
 
 % Relative_permittivity1=0;Relative_permittivity2=0;
 %% 类分离直线霍夫变换-off
@@ -372,13 +372,100 @@ figure;imagesc(abs(hilbert(data_summation_migration_total))); colormap(parula); 
  figure;imagesc(abs(hilbert(ratate_mig_data))); colormap(parula); title('BP偏移-希尔伯特变换包络');
 
  %% RTM migration 逆时偏移
- f0 = 4e8; % gprmax:4e8 real:
- v_model = ones(col_new)*3e8/sqrt(epsilon_r);
- [RTM_Image_Final, RTM_Image_Raw] = GPR_RTM_RealData(B_scan_image_Mean_cancel, dt*Downsample_N, 0.02, 0.02, v_model, f0, 0);
- figure;imagesc(RTM_Image_Final); colormap(parula); title('补偿逆时偏移');
- figure;imagesc(abs(hilbert(RTM_Image_Final))); colormap(parula); title('补偿逆时偏移-希尔伯特变换包络');
- figure;imagesc(RTM_Image_Raw); colormap(parula); title('逆时偏移');
- figure;imagesc(abs(hilbert(RTM_Image_Raw))); colormap(parula); title('逆时偏移-希尔伯特变换包络');
+ disp('正在准备 RTM 参数...');
+ 
+ % 提取纯物理波形
+ c_rtm = mean(B_scan_image_down_sample, 2);
+ B_scan_for_RTM = double(B_scan_image_down_sample) - c_rtm;
+ 
+ % 设置差分网格步长 (米)
+ dx = 0.005;
+ dz = 0.005;
+ 
+ % ================== 【核心修复：CFL 稳定性校验与重采样】 ==================
+ dt_current = dt * Downsample_N;               % 当前下采样后的时间步长 (秒)
+ v_max = 3e8;                                  % 模型中的最大波速 (空气中的光速)
+ dt_cfl_limit = 1 / (v_max * sqrt(1/dx^2 + 1/dz^2)) * 0.99; % 计算 CFL 极限 (乘 0.99 留点安全余量)
+ 
+ if dt_current > dt_cfl_limit
+     disp(['⚠️ 警告: 当前时间步长 (', num2str(dt_current), 's) 超出 FDTD 稳定极限！正在进行安全重采样...']);
+     % 重新计算一个安全的时间步数和时间轴
+     safe_rows = ceil((row_new * dt_current) / dt_cfl_limit);
+     dt_safe = dt_current / (safe_rows / row_new);
+     
+     % 对雷达数据在时间轴上进行样条插值，使其变密
+     t_old = (0:row_new-1) * dt_current;
+     t_safe_vector = (0:safe_rows-1) * dt_safe;
+     
+     B_scan_safe = zeros(safe_rows, col_new);
+     for col = 1:col_new
+         B_scan_safe(:, col) = interp1(t_old, B_scan_for_RTM(:, col), t_safe_vector, 'spline');
+     end
+     
+     B_scan_for_RTM = B_scan_safe;
+     t_vector = t_safe_vector;
+     dt_rtm = dt_safe;
+ else
+     t_vector = (0:row_new-1) * dt_current;
+     dt_rtm = dt_current;
+ end
+ % =======================================================================
+
+ t_input = t_vector * 1e9;                   % 转换为纳秒，适配 RTM 内部
+ dx_trace = TrackInterval;                   % 真实的道间距
+ x_max = (col_new - 1) * dx_trace;           % 动态计算模型总宽度 (米)
+ 
+ v_bg = 3e8 / sqrt(epsilon_r);               % 背景波速 (m/s)
+ z_max_theoretical = (t_vector(end) * v_bg) / 2; % 最大深度
+ z_max = ceil(z_max_theoretical * 10) / 10;  
+ 
+ % 修正直达波切除点数 
+ mute_time_ns = 3.0; 
+ n_c = round((mute_time_ns * 1e-9) / dt_rtm); 
+ if n_c < 0 || n_c > length(t_vector)/2; n_c = 0; end 
+ 
+ % 构建相对介电常数模型
+ nx_rtm = length(0:dx:x_max);
+ nz_rtm = length(0:dz:z_max);
+ ep_model = zeros(nz_rtm, nx_rtm); 
+ 
+ air_cells = max(round(0.05 / dz), 1); 
+ ep_model(1:air_cells, :) = epsilon_r;               
+ ep_model(air_cells+1:end, :) = epsilon_r;   
+ 
+ % 调用 RTM
+ [RTM_image, x_rtm, z_rtm] = RTM(B_scan_for_RTM, t_input, ep_model, x_max, z_max, dx, dz, dx_trace, n_c);
+ 
+ % ================== 【绘图防御性修复】 ==================
+ figure('Name', 'RTM 成像结果 (灰度)'); 
+ cmax = max(abs(RTM_image(:))) * 0.3; 
+ if isnan(cmax) || cmax <= 0
+     warning('RTM 输出矩阵发散 (NaN) 或为空！已强制调整色标以防绘图崩溃。');
+     cmax = 1e-6; % 给一个微小值防止报错
+ end
+ imagesc(x_rtm, z_rtm, RTM_image, [-cmax cmax]);
+ colormap('gray'); ylabel('Depth (m)'); xlabel('Distance (m)');
+ set(gca, 'FontSize', 14); colorbar; % pbaspect([2 1 1]);
+ title(['RTM 成像 (自适应 \epsilon_r = ', num2str(epsilon_r, '%.2f'), ')']);
+ 
+ figure('Name', 'RTM 成像结果 (包络)');
+ RTM_env = abs(hilbert(RTM_image));
+ env_max = max(RTM_env(:)) * 0.3; 
+ if isnan(env_max) || env_max <= 0
+     env_max = 1e-6; % 给一个微小值防止报错
+ end
+ imagesc(x_rtm, z_rtm, RTM_env, [0 env_max]);
+ colormap(parula); ylabel('Depth (m)'); xlabel('Distance (m)');
+ set(gca, 'FontSize', 14); colorbar; % pbaspect([2 1 1]);
+ title('RTM 成像 - 希尔伯特变换包络'); 
+
+ % f0 = 4e8; % gprmax:4e8 real:
+ % v_model = ones(col_new)*3e8/sqrt(epsilon_r);
+ % [RTM_Image_Final, RTM_Image_Raw] = GPR_RTM_RealData(B_scan_image_Mean_cancel, dt*Downsample_N, TrackInterval, TrackInterval, v_model, f0, 0);
+ % figure;imagesc(RTM_Image_Final); colormap(parula); title('补偿逆时偏移');
+ % figure;imagesc(abs(hilbert(RTM_Image_Final))); colormap(parula); title('补偿逆时偏移-希尔伯特变换包络');
+ % figure;imagesc(RTM_Image_Raw); colormap(parula); title('逆时偏移');
+ % figure;imagesc(abs(hilbert(RTM_Image_Raw))); colormap(parula); title('逆时偏移-希尔伯特变换包络');
 
 %% 偏移展示
 figure('Name', '偏移算法效果对比', 'Position', [100, 100, 1200, 800]);
@@ -417,14 +504,19 @@ title('Stolt偏移');
 subplot(2, 4, 6);
 imagesc(abs(hilbert(ratate_mig_theta_data)));
 colormap(parula);
-title('旋转偏移');
+title('BP偏移');
 
 % 7. 逆时偏移
-subplot(2, 4, 6);
-imagesc(abs(hilbert(RTM_Image_Final)));
+subplot(2, 4, 7);
+imagesc(RTM_env,[0 env_max]);
 colormap(parula);
 title('逆时偏移');
 
+% 8. 逆时偏移
+subplot(2, 4, 8);
+imagesc(RTM_image,[-cmax cmax]);
+colormap(parula);
+title('逆时偏移（原）');
 
 %% 手动标注——膨胀-off
 % data_out = 1 - data_out;
